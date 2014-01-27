@@ -11,6 +11,9 @@ app = Flask(__name__)
 
 version = '/1.0'
 
+secrets = ConfigParser.ConfigParser()
+secrets.read("secrets.cfg")
+
 # Google api prefs:
 googBaseURL = 'https://maps.googleapis.com/maps/api'
 format = '/json'
@@ -56,20 +59,24 @@ def venues():
 	encoded = request.args.get('polyline')
 	decoded = decode_line(encoded)
 
-	secrets = ConfigParser.ConfigParser()
-	secrets.read("secrets.cfg")
 	clientID = secrets.get("foursquare", "clientID")
 	clientSecret = secrets.get("foursquare", "clientSecret")
 
 	session = FuturesSession()
 	reqs = []
-	responses = []
-	for waypt in decoded[0:1]:
+	for waypt in decoded[0::20]:
 		reqs.append(getVenuesNearLocation(waypt, category, clientID, clientSecret, session))
-	# for req in reqs:
-	response = reqs[0].result()
-	# responses.append(response.content)
-	return jsonify({"responses": response.json()})
+	
+	allVenues = []
+	ids = []   #<- for uniquing 
+	for req in reqs:
+		response = req.result()
+		json = response.json()
+		venues = [item["venue"] for item in json["response"]["groups"][0]["items"]
+					if item["venue"]["id"] not in ids]
+		ids.extend([venue["id"] for venue in venues])
+		allVenues.extend(venues)
+	return jsonify({"venues": allVenues})
 
 def getVenuesNearLocation(coords, category, clientID, clientSecret, session):
 	ll = str(coords[0]) + ',' + str(coords[1])
@@ -78,7 +85,8 @@ def getVenuesNearLocation(coords, category, clientID, clientSecret, session):
 		 "section": category,
        "client_id": clientID,
    "client_secret": clientSecret,
-			   "v": date}
+			   "v": date,
+		   "limit": 5}
 	return session.get(fsBaseURL + "/venues/explore", params=params)
 
 if __name__ == '__main__':
