@@ -21,6 +21,10 @@ format = '/json'
 # Foursquare:
 fsBaseURL = 'https://api.foursquare.com/v2'
 
+@app.route('/')
+def index():
+	return "Byway"
+
 @app.route(version + '/geocode')
 def geocode():
 	q = request.args.get('q')
